@@ -25,10 +25,7 @@ fn get_file_reader(path: &Path) -> io::Result<BufReader<fs::File>> {
     Ok(BufReader::new(file))
 }
 
-fn process_src_file<R: BufRead>(reader: R) -> io::Result<Vec<String>> {
-    let re = Regex::new(r#"env::var\(\s*"([A-Za-z_][A-Za-z0-9_]*)"\s*\)"#)
-        .expect("hardcoded regex must be valid");
-
+fn process_src_file<R: BufRead>(reader: R, re: &Regex) -> io::Result<Vec<String>> {
     let mut env_variables = Vec::new();
 
     for line in reader.lines() {
@@ -41,6 +38,7 @@ fn process_src_file<R: BufRead>(reader: R) -> io::Result<Vec<String>> {
     Ok(env_variables)
 }
 
+#[derive(Debug)]
 pub struct AnalysisResult {
     pub unused: HashSet<String>,
     pub missing: HashSet<String>,
@@ -49,6 +47,9 @@ pub struct AnalysisResult {
 pub fn analyze(env_file: &Path, src_dir: &Path) -> io::Result<AnalysisResult> {
     let env_variables = process_env_file(get_file_reader(env_file)?)?;
     let mut src_env_variables = Vec::new();
+
+    let re = Regex::new(r#"env::var\(\s*"([A-Za-z_][A-Za-z0-9_]*)"\s*\)"#)
+        .expect("hardcoded regex must be valid");
 
     for entry in WalkDir::new(src_dir) {
         let entry = entry.map_err(|e| {
@@ -61,7 +62,7 @@ pub fn analyze(env_file: &Path, src_dir: &Path) -> io::Result<AnalysisResult> {
 
         let path = entry.path();
         if path.is_file() && path.extension().and_then(|ext| ext.to_str()) == Some("rs") {
-            let mut envs = process_src_file(get_file_reader(path)?)?;
+            let mut envs = process_src_file(get_file_reader(path)?, &re)?;
             src_env_variables.append(&mut envs);
         }
     }
@@ -111,8 +112,10 @@ mod tests {
     fn test_extracts_env_variables_from_src_file() {
         let input = "fn main() {\n    env::var(\"FOO\");\n    env::var(\"BAR\");\n}";
         let reader = Cursor::new(input);
+        let re = Regex::new(r#"env::var\(\s*"([A-Za-z_][A-Za-z0-9_]*)"\s*\)"#)
+            .expect("hardcoded regex must be valid");
 
-        let envs = process_src_file(reader).unwrap();
+        let envs = process_src_file(reader, &re).unwrap();
 
         assert!(envs.contains(&"FOO".to_string()));
         assert!(envs.contains(&"BAR".to_string()));

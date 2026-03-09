@@ -20,14 +20,14 @@ fn main() -> std::process::ExitCode {
     let args = Args::parse();
 
     let env_file = Path::new(&args.env_file);
-    if !env_file.exists() && !env_file.is_file() {
-        println!("The env file does not exist or is not a file");
+    if !env_file.exists() || !env_file.is_file() {
+        eprintln!("The env file does not exist or is not a file");
         return std::process::ExitCode::FAILURE;
     }
 
     let src_dir = Path::new(&args.src_dir);
-    if !src_dir.exists() && !src_dir.is_dir() {
-        println!("The src dir does not exist or is not a directory");
+    if !src_dir.exists() || !src_dir.is_dir() {
+        eprintln!("The src dir does not exist or is not a directory");
         return std::process::ExitCode::FAILURE;
     }
 
