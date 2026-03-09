@@ -1,26 +1,31 @@
-use std::fs;
+use regex::Regex;
 use std::collections::HashSet;
+use std::fs;
 use std::io::{BufRead, BufReader};
 use std::path::{Path, PathBuf};
 use walkdir::WalkDir;
-use regex::Regex;
 
-fn read_env_file(env_file: String) -> HashSet<String> {
-    let file = fs::File::open(env_file).expect("Unable to open file");
-    let reader = BufReader::new(file);
+fn read_env<R: BufRead>(reader: R) -> HashSet<String> {
+    let mut env_variables = HashSet::new();
 
-    let mut env_variables: HashSet<String> = HashSet::new();
     for line in reader.lines() {
         let line = line.expect("Unable to read line");
-        let parts: Option<(&str, &str)> = line.split_once('=');
-        if parts.is_some() {
-           env_variables.insert(parts.unwrap().0.to_string());
+        if let Some((key, _value)) = line.split_once('=') {
+            env_variables.insert(key.to_string());
         }
     }
+
     env_variables
 }
 
-fn collect_src_files(src_dir: String) -> Vec<PathBuf> {
+fn read_env_file(env_file: &Path) -> HashSet<String> {
+    let file = fs::File::open(env_file)
+        .expect(format!("Unable to open file {}", env_file.display()).as_str());
+    let reader = BufReader::new(file);
+    read_env(reader)
+}
+
+fn collect_src_files(src_dir: &Path) -> Vec<PathBuf> {
     WalkDir::new(src_dir)
         .into_iter()
         .filter_map(|entry| entry.ok())
@@ -30,11 +35,11 @@ fn collect_src_files(src_dir: String) -> Vec<PathBuf> {
         .collect()
 }
 
-fn extract_env_variables(src_file: PathBuf) -> Vec<String> {
-    let mut env_variables: Vec<String> = vec![];
+fn process_src_file<R: BufRead>(reader: R) -> Vec<String> {
     let re = Regex::new(r#"env::var\(\s*"([A-Za-z_][A-Za-z0-9_]*)"\s*\)"#).unwrap();
-
-    for line in fs::read_to_string(src_file).expect("Unable to read file").lines() {
+    let mut env_variables: Vec<String> = vec![];
+    for line in reader.lines() {
+        let line = line.expect("Unable to read line");
         if let Some(caps) = re.captures(&line) {
             env_variables.push(caps[1].to_string());
         }
@@ -42,39 +47,46 @@ fn extract_env_variables(src_file: PathBuf) -> Vec<String> {
     env_variables
 }
 
-pub fn run(env_file: String, src_dir: String) {
-    if !Path::new(&env_file).exists() {
-        println!("The env file does not exist");
-        return;
-    }
+fn extract_env_variables(src_file: &Path) -> Vec<String> {
+    let file = fs::File::open(src_file)
+        .expect(format!("Unable to open file {}", src_file.display()).as_str());
+    let reader = BufReader::new(file);
+    process_src_file(reader)
+}
 
-    if !Path::new(&src_dir).exists() {
-        println!("The src dir does not exist");
-        return;
-    }
+pub struct AnalysisResult {
+    pub unused: HashSet<String>,
+    pub missing: HashSet<String>,
+}
 
+pub fn analyze(env_file: &Path, src_dir: &Path) -> AnalysisResult {
     let env_variables = read_env_file(env_file);
     let src_files = collect_src_files(src_dir);
 
-    println!("{:?}", env_variables);
-    println!("{:?}", src_files);
-
     let mut src_env_variables: Vec<String> = vec![];
     for file in src_files {
-        let mut env_variables = extract_env_variables(file);
+        let mut env_variables = extract_env_variables(&file);
         src_env_variables.append(&mut env_variables);
     }
 
     let unique_src_env_variables: HashSet<String> = src_env_variables.into_iter().collect();
-    println!("{:?}", unique_src_env_variables);
-
     let unused_env_variables = env_variables.difference(&unique_src_env_variables);
-    for env_variable in unused_env_variables {
+    let missing_env_variables = unique_src_env_variables.difference(&env_variables);
+
+    AnalysisResult {
+        unused: unused_env_variables.cloned().collect(),
+        missing: missing_env_variables.cloned().collect(),
+    }
+}
+
+pub fn run(env_file: &Path, src_dir: &Path) {
+    let result = analyze(env_file, src_dir);
+
+    for env_variable in &result.unused {
         println!("Unused env variable: {}", env_variable);
     }
 
-    let missing_env_variables = unique_src_env_variables.difference(&env_variables);
-    for env_variable in missing_env_variables {
+    for env_variable in &result.missing {
         println!("Missing env variable: {}", env_variable);
     }
 }
@@ -82,6 +94,29 @@ pub fn run(env_file: String, src_dir: String) {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::io::Cursor;
 
+    #[test]
+    fn test_reads_env_vars_from_reader() {
+        let input = "FOO=bar\nBAZ=qux\nINVALID_LINE\n";
+        let reader = Cursor::new(input);
 
+        let envs = read_env(reader);
+
+        assert!(envs.contains("FOO"));
+        assert!(envs.contains("BAZ"));
+        assert!(!envs.contains("INVALID_LINE"));
+    }
+
+    #[test]
+    fn test_extracts_env_variables_from_src_file() {
+        let input = "fn main() {\n    env::var(\"FOO\");\n    env::var(\"BAR\");\n}";
+        let reader = Cursor::new(input);
+
+        let envs = process_src_file(reader);
+
+        assert!(envs.contains(&"FOO".to_string()));
+        assert!(envs.contains(&"BAR".to_string()));
+        assert!(!envs.contains(&"INVALID_LINE".to_string()));
+    }
 }
