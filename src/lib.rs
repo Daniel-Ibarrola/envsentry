@@ -1,7 +1,6 @@
 mod env_file_reader;
 mod src_file_reader;
 
-use regex::Regex;
 use std::collections::HashSet;
 use std::fs;
 use std::io::{self, BufReader};
@@ -28,9 +27,6 @@ pub fn analyze(env_file: &Path, src_dir: &Path) -> io::Result<AnalysisResult> {
     let env_variables = env_file_reader::process_env_file(get_file_reader(env_file)?)?;
     let mut src_env_variables = Vec::new();
 
-    let re = Regex::new(r#"env::var\(\s*"([A-Za-z_][A-Za-z0-9_]*)"\s*\)"#)
-        .expect("hardcoded regex must be valid");
-
     for entry in WalkDir::new(src_dir) {
         let entry = entry.map_err(|e| {
             io::Error::other(format!(
@@ -42,7 +38,7 @@ pub fn analyze(env_file: &Path, src_dir: &Path) -> io::Result<AnalysisResult> {
 
         let path = entry.path();
         if path.is_file() && path.extension().and_then(|ext| ext.to_str()) == Some("rs") {
-            let mut envs = src_file_reader::process_src_file(get_file_reader(path)?, &re)?;
+            let mut envs = src_file_reader::process_src_file(get_file_reader(path)?)?;
             src_env_variables.append(&mut envs);
         }
     }
