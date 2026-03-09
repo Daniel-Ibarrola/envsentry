@@ -1,41 +1,21 @@
+mod env_file_reader;
+mod src_file_reader;
+
 use regex::Regex;
 use std::collections::HashSet;
 use std::fs;
-use std::io::{self, BufRead, BufReader};
-use std::path::{Path};
+use std::io::{self, BufReader};
+use std::path::Path;
 use walkdir::WalkDir;
-
-fn process_env_file<R: BufRead>(reader: R) -> io::Result<HashSet<String>> {
-    let mut env_variables = HashSet::new();
-
-    for line in reader.lines() {
-        let line = line?;
-        if let Some((key, _value)) = line.split_once('=') {
-            env_variables.insert(key.to_string());
-        }
-    }
-
-    Ok(env_variables)
-}
 
 fn get_file_reader(path: &Path) -> io::Result<BufReader<fs::File>> {
     let file = fs::File::open(path).map_err(|e| {
-        io::Error::new(e.kind(), format!("failed to open {}: {}", path.display(), e))
+        io::Error::new(
+            e.kind(),
+            format!("failed to open {}: {}", path.display(), e),
+        )
     })?;
     Ok(BufReader::new(file))
-}
-
-fn process_src_file<R: BufRead>(reader: R, re: &Regex) -> io::Result<Vec<String>> {
-    let mut env_variables = Vec::new();
-
-    for line in reader.lines() {
-        let line = line?;
-        if let Some(caps) = re.captures(&line) {
-            env_variables.push(caps[1].to_string());
-        }
-    }
-
-    Ok(env_variables)
 }
 
 #[derive(Debug)]
@@ -45,7 +25,7 @@ pub struct AnalysisResult {
 }
 
 pub fn analyze(env_file: &Path, src_dir: &Path) -> io::Result<AnalysisResult> {
-    let env_variables = process_env_file(get_file_reader(env_file)?)?;
+    let env_variables = env_file_reader::process_env_file(get_file_reader(env_file)?)?;
     let mut src_env_variables = Vec::new();
 
     let re = Regex::new(r#"env::var\(\s*"([A-Za-z_][A-Za-z0-9_]*)"\s*\)"#)
@@ -62,7 +42,7 @@ pub fn analyze(env_file: &Path, src_dir: &Path) -> io::Result<AnalysisResult> {
 
         let path = entry.path();
         if path.is_file() && path.extension().and_then(|ext| ext.to_str()) == Some("rs") {
-            let mut envs = process_src_file(get_file_reader(path)?, &re)?;
+            let mut envs = src_file_reader::process_src_file(get_file_reader(path)?, &re)?;
             src_env_variables.append(&mut envs);
         }
     }
@@ -91,34 +71,3 @@ pub fn run(env_file: &Path, src_dir: &Path) -> io::Result<()> {
     Ok(())
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use std::io::Cursor;
-
-    #[test]
-    fn test_extracts_env_variables_from_env_file() {
-        let input = "FOO=bar\nBAZ=qux\nINVALID_LINE\n";
-        let reader = Cursor::new(input);
-
-        let envs = process_env_file(reader).unwrap();
-
-        assert!(envs.contains("FOO"));
-        assert!(envs.contains("BAZ"));
-        assert!(!envs.contains("INVALID_LINE"));
-    }
-
-    #[test]
-    fn test_extracts_env_variables_from_src_file() {
-        let input = "fn main() {\n    env::var(\"FOO\");\n    env::var(\"BAR\");\n}";
-        let reader = Cursor::new(input);
-        let re = Regex::new(r#"env::var\(\s*"([A-Za-z_][A-Za-z0-9_]*)"\s*\)"#)
-            .expect("hardcoded regex must be valid");
-
-        let envs = process_src_file(reader, &re).unwrap();
-
-        assert!(envs.contains(&"FOO".to_string()));
-        assert!(envs.contains(&"BAR".to_string()));
-        assert!(!envs.contains(&"INVALID_LINE".to_string()));
-    }
-}
