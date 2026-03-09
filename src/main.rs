@@ -16,21 +16,27 @@ struct Args {
     src_dir: String,
 }
 
-fn main() {
+fn main() -> std::process::ExitCode {
     let args = Args::parse();
 
     let env_file = Path::new(&args.env_file);
     if !env_file.exists() && !env_file.is_file() {
         println!("The env file does not exist or is not a file");
-        return;
+        return std::process::ExitCode::FAILURE;
     }
 
     let src_dir = Path::new(&args.src_dir);
     if !src_dir.exists() && !src_dir.is_dir() {
         println!("The src dir does not exist or is not a directory");
-        return;
+        return std::process::ExitCode::FAILURE;
     }
 
     println!("Running envsentry...");
-    run(env_file, src_dir);
+    match run(env_file, src_dir) {
+        Ok(()) => std::process::ExitCode::SUCCESS,
+        Err(e) => {
+            eprintln!("Error: {}", e);
+            std::process::ExitCode::FAILURE
+        }
+    }
 }

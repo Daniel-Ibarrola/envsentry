@@ -26,7 +26,7 @@ fn finds_unused_and_missing_env_vars() {
     )
     .unwrap();
 
-    let result = analyze(&env_file, &src_dir);
+    let result = analyze(&env_file, &src_dir).unwrap();
 
     assert!(result.unused.contains("UNUSED_KEY"));
     assert!(result.missing.contains("MISSING_KEY"));
