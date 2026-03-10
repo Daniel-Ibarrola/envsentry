@@ -26,18 +26,27 @@ fn is_valid_key(key: &str) -> bool {
     chars.all(|c| c == '_' || c.is_ascii_alphanumeric())
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct EnvDefinition {
+    pub name: String,
+    pub line: usize,
+}
+
 /// Processes an environment file and returns a set of unique environment variable keys.
 ///
-/// This function reads from a `BufRead` source line by line, identifies environment variable 
+/// This function reads from a `BufRead` source line by line, identifies environment variable
 /// definitions, and extracts their keys. It handles comments, empty lines, and the `export` prefix.
 ///
 /// # Errors
 ///
 /// Returns an `std::io::Error` if reading from the `reader` fails.
-pub fn process_env_file<R: BufRead>(reader: R) -> io::Result<HashSet<String>> {
+pub fn process_env_file<R: BufRead>(
+    reader: R,
+) -> io::Result<(HashSet<String>, Vec<EnvDefinition>)> {
     let mut env_variables = HashSet::new();
+    let mut env_definitions: Vec<EnvDefinition> = Vec::new();
 
-    for line in reader.lines() {
+    for (line_number, line) in reader.lines().enumerate() {
         let line = line?;
 
         let trimmed = line.trim();
@@ -53,11 +62,15 @@ pub fn process_env_file<R: BufRead>(reader: R) -> io::Result<HashSet<String>> {
 
             if is_valid_key(normalized_key) {
                 env_variables.insert(normalized_key.to_string());
+                env_definitions.push(EnvDefinition {
+                    name: normalized_key.to_string(),
+                    line: line_number,
+                });
             }
         }
     }
 
-    Ok(env_variables)
+    Ok((env_variables, env_definitions))
 }
 
 #[cfg(test)]
@@ -70,11 +83,17 @@ mod tests {
         let input = "FOO=bar\nBAZ=qux\nINVALID_LINE\n";
         let reader = Cursor::new(input);
 
-        let envs = process_env_file(reader).unwrap();
+        let (envs, definitions) = process_env_file(reader).unwrap();
 
         assert!(envs.contains("FOO"));
         assert!(envs.contains("BAZ"));
         assert!(!envs.contains("INVALID_LINE"));
+
+        assert_eq!(definitions.len(), 2);
+        assert_eq!(definitions[0].name, "FOO");
+        assert_eq!(definitions[0].line, 0);
+        assert_eq!(definitions[1].name, "BAZ");
+        assert_eq!(definitions[1].line, 1);
     }
 
     #[test]
@@ -82,11 +101,15 @@ mod tests {
         let input = "FOO=bar\n\nBAZ=qux\n";
         let reader = Cursor::new(input);
 
-        let envs = process_env_file(reader).unwrap();
+        let (envs, definitions) = process_env_file(reader).unwrap();
 
         assert_eq!(envs.len(), 2);
         assert!(envs.contains("FOO"));
         assert!(envs.contains("BAZ"));
+
+        assert_eq!(definitions.len(), 2);
+        assert_eq!(definitions[0].line, 0);
+        assert_eq!(definitions[1].line, 2);
     }
 
     #[test]
@@ -94,10 +117,13 @@ mod tests {
         let input = "# This is a comment\nFOO=bar\n";
         let reader = Cursor::new(input);
 
-        let envs = process_env_file(reader).unwrap();
+        let (envs, definitions) = process_env_file(reader).unwrap();
 
         assert_eq!(envs.len(), 1);
         assert!(envs.contains("FOO"));
+
+        assert_eq!(definitions.len(), 1);
+        assert_eq!(definitions[0].line, 1);
     }
 
     #[test]
@@ -105,7 +131,7 @@ mod tests {
         let input = "FOO = bar\nBAZ = qux\n";
         let reader = Cursor::new(input);
 
-        let envs = process_env_file(reader).unwrap();
+        let (envs, _) = process_env_file(reader).unwrap();
 
         assert_eq!(envs.len(), 2);
         assert!(envs.contains("FOO"));
@@ -117,7 +143,7 @@ mod tests {
         let input = "   # This is a comment\nFOO=bar\n";
         let reader = Cursor::new(input);
 
-        let envs = process_env_file(reader).unwrap();
+        let (envs, _) = process_env_file(reader).unwrap();
 
         assert_eq!(envs.len(), 1);
         assert!(envs.contains("FOO"));
@@ -128,7 +154,7 @@ mod tests {
         let input = "export FOO=bar\nBAR=baz\n";
         let reader = Cursor::new(input);
 
-        let envs = process_env_file(reader).unwrap();
+        let (envs, _) = process_env_file(reader).unwrap();
 
         assert_eq!(envs.len(), 2);
         assert!(envs.contains("FOO"));
@@ -141,7 +167,7 @@ mod tests {
         let input = "=bar\nFOO=baz\n";
         let reader = Cursor::new(input);
 
-        let envs = process_env_file(reader).unwrap();
+        let (envs, _) = process_env_file(reader).unwrap();
 
         assert_eq!(envs.len(), 1);
         assert!(envs.contains("FOO"));
@@ -153,7 +179,7 @@ mod tests {
         let input = "123FOO=bar\nFOO-BAR=baz\nGOOD_NAME=ok\n";
         let reader = Cursor::new(input);
 
-        let envs = process_env_file(reader).unwrap();
+        let (envs, _) = process_env_file(reader).unwrap();
 
         assert_eq!(envs.len(), 1);
         assert!(envs.contains("GOOD_NAME"));
@@ -166,7 +192,7 @@ mod tests {
         let input = "\u{FEFF}FOO=bar\nBAR=baz\n";
         let reader = Cursor::new(input);
 
-        let envs = process_env_file(reader).unwrap();
+        let (envs, _) = process_env_file(reader).unwrap();
 
         assert_eq!(envs.len(), 2);
         assert!(envs.contains("FOO"));
@@ -179,11 +205,13 @@ mod tests {
         let input = "FOO=one\nFOO=two\nBAR=three\n";
         let reader = Cursor::new(input);
 
-        let envs = process_env_file(reader).unwrap();
+        let (envs, definitions) = process_env_file(reader).unwrap();
 
         assert_eq!(envs.len(), 2);
         assert!(envs.contains("FOO"));
         assert!(envs.contains("BAR"));
+
+        assert_eq!(definitions.len(), 3);
     }
 
     #[test]
@@ -191,7 +219,7 @@ mod tests {
         let input = "FOO=\nBAR=baz\n";
         let reader = Cursor::new(input);
 
-        let envs = process_env_file(reader).unwrap();
+        let (envs, _) = process_env_file(reader).unwrap();
 
         assert_eq!(envs.len(), 2);
         assert!(envs.contains("FOO"));
@@ -203,7 +231,7 @@ mod tests {
         let input = "DATABASE_URL=postgres://user:pass@host/db?x=y\nFOO=bar\n";
         let reader = Cursor::new(input);
 
-        let envs = process_env_file(reader).unwrap();
+        let (envs, _) = process_env_file(reader).unwrap();
 
         assert_eq!(envs.len(), 2);
         assert!(envs.contains("DATABASE_URL"));

@@ -1,30 +1,37 @@
+use regex::Regex;
 use std::io;
 use std::io::BufRead;
 use std::sync::OnceLock;
-use regex::Regex;
+
+// #[derive(Debug)]
+// struct EnvOccurrence {
+//     name: String,
+//     file: std::path::PathBuf,
+//     line: usize,
+//     column: usize,
+// }
 
 fn src_env_regex() -> &'static Regex {
     static RE: OnceLock<Regex> = OnceLock::new();
     RE.get_or_init(|| {
-        Regex::new(r#"env::var\(\s*"([A-Za-z_][A-Za-z0-9_]*)"\s*\)"#)
+        Regex::new(r#"(?:(?:std::)?env::(?:var|var_os)|var|env!|option_env!)\(\s*"([A-Za-z_][A-Za-z0-9_]*)"\s*\)"#)
             .expect("hardcoded regex must be valid")
     })
 }
 
-pub fn process_src_file<R: BufRead>(reader: R) -> io::Result<Vec<String>> {
+pub fn process_src_file<R: BufRead>(mut reader: R) -> io::Result<Vec<String>> {
     let mut env_variables = Vec::new();
     let re = src_env_regex();
 
-    for line in reader.lines() {
-        let line = line?;
-        if let Some(caps) = re.captures(&line) {
-            env_variables.push(caps[1].to_string());
-        }
+    let mut content = String::new();
+    reader.read_to_string(&mut content)?;
+
+    for caps in re.captures_iter(&content) {
+        env_variables.push(caps[1].to_string());
     }
 
     Ok(env_variables)
 }
-
 
 #[cfg(test)]
 mod tests {
@@ -46,10 +53,11 @@ mod tests {
         assert!(envs.contains(&"BAR".to_string()));
         assert!(!envs.contains(&"INVALID_LINE".to_string()));
     }
-    
+
     #[test]
     fn test_extracts_env_variables_from_std_env_var_calls() {
-        let input = "fn main() {\n    std::env::var(\"API_KEY\");\n    std::env::var(\"SECRET_KEY\");\n}";
+        let input =
+            "fn main() {\n    std::env::var(\"API_KEY\");\n    std::env::var(\"SECRET_KEY\");\n}";
 
         let envs = process(input);
 
@@ -68,7 +76,8 @@ mod tests {
 
     #[test]
     fn test_extracts_env_variables_from_var_os_calls() {
-        let input = "fn main() {\n    env::var_os(\"API_KEY\");\n    std::env::var_os(\"SECRET_KEY\");\n}";
+        let input =
+            "fn main() {\n    env::var_os(\"API_KEY\");\n    std::env::var_os(\"SECRET_KEY\");\n}";
 
         let envs = process(input);
 
@@ -102,5 +111,4 @@ mod tests {
 
         assert!(envs.contains(&"API_KEY".to_string()));
     }
-
 }
