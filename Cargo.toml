@@ -2,6 +2,12 @@
 name = "envsentry"
 version = "0.1.0"
 edition = "2024"
+description = "A command-line tool for analyzing environment variables in Rust source code"
+license = "MIT"
+repository = "https://github.com/Daniel-Ibarrola/envsentry"
+readme = "README.md"
+keywords = ["cli", "env"]
+categories = ["command-line-utilities"]
 
 [dependencies]
 clap = { version = "4.5.60", features = ["derive"] }
