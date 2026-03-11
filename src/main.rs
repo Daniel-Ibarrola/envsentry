@@ -32,6 +32,10 @@ fn main() -> std::process::ExitCode {
     }
 
     println!("Running envsentry...");
+    println!("Environment file: {}", env_file.display());
+    println!("Source directory: {}", src_dir.display());
+    println!();
+
     match run(env_file, src_dir) {
         Ok(()) => std::process::ExitCode::SUCCESS,
         Err(e) => {

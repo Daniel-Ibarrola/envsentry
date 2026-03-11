@@ -32,6 +32,6 @@ fn finds_unused_and_missing_env_vars() {
     assert_eq!(result.unused[0].name, "UNUSED_KEY");
     assert_eq!(result.unused[0].line, 1);
 
-    assert!(result.missing.contains("MISSING_KEY"));
-    assert!(!result.missing.contains("USED_KEY"));
+    assert!(result.missing.iter().any(|occ| occ.name == "MISSING_KEY"));
+    assert!(!result.missing.iter().any(|occ| occ.name == "USED_KEY"));
 }

@@ -21,13 +21,13 @@ fn get_file_reader(path: &Path) -> io::Result<BufReader<fs::File>> {
 #[derive(Debug)]
 pub struct AnalysisResult {
     pub unused: Vec<EnvDefinition>,
-    pub missing: HashSet<String>,
+    pub missing: Vec<src_file_reader::EnvOccurrence>,
 }
 
 pub fn analyze(env_file: &Path, src_dir: &Path) -> io::Result<AnalysisResult> {
     let (env_variables, env_definitions) =
         env_file_reader::process_env_file(get_file_reader(env_file)?)?;
-    let mut src_env_variables = Vec::new();
+    let mut src_env_occurrences = Vec::new();
 
     for entry in WalkDir::new(src_dir) {
         let entry = entry.map_err(|e| {
@@ -41,13 +41,20 @@ pub fn analyze(env_file: &Path, src_dir: &Path) -> io::Result<AnalysisResult> {
         let path = entry.path();
         if path.is_file() && path.extension().and_then(|ext| ext.to_str()) == Some("rs") {
             let mut envs = src_file_reader::process_src_file(get_file_reader(path)?)?;
-            src_env_variables.append(&mut envs);
+            src_env_occurrences.append(&mut envs);
         }
     }
 
-    let unique_src_env_variables: HashSet<String> = src_env_variables.into_iter().collect();
+    let mut missing_env_occurrences = Vec::new();
+    let mut unique_src_env_variables = HashSet::new();
+    for occurrence in src_env_occurrences {
+        if !env_variables.contains(&occurrence.name) {
+            missing_env_occurrences.push(occurrence.clone());
+        }
+        unique_src_env_variables.insert(occurrence.name);
+    }
+
     let unused_env_variables = env_variables.difference(&unique_src_env_variables);
-    let missing_env_variables = unique_src_env_variables.difference(&env_variables);
 
     let mut unused_env_definitions: Vec<EnvDefinition> = Vec::new();
     for env_variable in unused_env_variables {
@@ -60,7 +67,7 @@ pub fn analyze(env_file: &Path, src_dir: &Path) -> io::Result<AnalysisResult> {
 
     Ok(AnalysisResult {
         unused: unused_env_definitions,
-        missing: missing_env_variables.cloned().collect(),
+        missing: missing_env_occurrences,
     })
 }
 
@@ -72,13 +79,16 @@ pub fn run(env_file: &Path, src_dir: &Path) -> io::Result<()> {
             "Unused env variable: {} ({}:{})",
             env_variable.name,
             env_file.display(),
-            env_variable.line
+            env_variable.line + 1
         );
     }
     println!();
 
-    for env_variable in &result.missing {
-        println!("Missing env variable: {}", env_variable);
+    for occurrence in &result.missing {
+        println!(
+            "Missing env variable: {} (at line {}, column {})",
+            occurrence.name, occurrence.line, occurrence.column
+        );
     }
 
     Ok(())
