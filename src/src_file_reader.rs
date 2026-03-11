@@ -6,6 +6,7 @@ use std::sync::OnceLock;
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct EnvOccurrence {
     pub name: String,
+    pub file_path: String,
     pub line: usize,
     pub column: usize,
 }
@@ -18,7 +19,10 @@ fn src_env_regex() -> &'static Regex {
     })
 }
 
-pub fn process_src_file<R: BufRead>(mut reader: R) -> io::Result<Vec<EnvOccurrence>> {
+pub fn process_src_file<R: BufRead>(
+    mut reader: R,
+    file_path: &str,
+) -> io::Result<Vec<EnvOccurrence>> {
     let mut env_occurrences = Vec::new();
     let re = src_env_regex();
 
@@ -42,6 +46,7 @@ pub fn process_src_file<R: BufRead>(mut reader: R) -> io::Result<Vec<EnvOccurren
 
         env_occurrences.push(EnvOccurrence {
             name,
+            file_path: file_path.to_string(),
             line: line + 1,
             column,
         });
@@ -57,7 +62,7 @@ mod tests {
 
     fn process(input: &str) -> Vec<EnvOccurrence> {
         let reader = Cursor::new(input);
-        process_src_file(reader).unwrap()
+        process_src_file(reader, "test.rs").unwrap()
     }
 
     #[test]
@@ -66,8 +71,14 @@ mod tests {
 
         let envs = process(input);
 
-        assert!(envs.iter().any(|e| e.name == "FOO" && e.line == 2 && e.column == 15));
-        assert!(envs.iter().any(|e| e.name == "BAR" && e.line == 3 && e.column == 15));
+        assert!(
+            envs.iter()
+                .any(|e| e.name == "FOO" && e.line == 2 && e.column == 15 && e.file_path == "test.rs")
+        );
+        assert!(
+            envs.iter()
+                .any(|e| e.name == "BAR" && e.line == 3 && e.column == 15 && e.file_path == "test.rs")
+        );
     }
 
     #[test]
@@ -77,8 +88,14 @@ mod tests {
 
         let envs = process(input);
 
-        assert!(envs.iter().any(|e| e.name == "API_KEY" && e.line == 2 && e.column == 20));
-        assert!(envs.iter().any(|e| e.name == "SECRET_KEY" && e.line == 3 && e.column == 20));
+        assert!(
+            envs.iter()
+                .any(|e| e.name == "API_KEY" && e.line == 2 && e.column == 20)
+        );
+        assert!(
+            envs.iter()
+                .any(|e| e.name == "SECRET_KEY" && e.line == 3 && e.column == 20)
+        );
     }
 
     #[test]
@@ -87,7 +104,10 @@ mod tests {
 
         let envs = process(input);
 
-        assert!(envs.iter().any(|e| e.name == "API_KEY" && e.line == 3 && e.column == 10));
+        assert!(
+            envs.iter()
+                .any(|e| e.name == "API_KEY" && e.line == 3 && e.column == 10)
+        );
     }
 
     #[test]
@@ -97,8 +117,14 @@ mod tests {
 
         let envs = process(input);
 
-        assert!(envs.iter().any(|e| e.name == "API_KEY" && e.line == 2 && e.column == 18));
-        assert!(envs.iter().any(|e| e.name == "SECRET_KEY" && e.line == 3 && e.column == 23));
+        assert!(
+            envs.iter()
+                .any(|e| e.name == "API_KEY" && e.line == 2 && e.column == 18)
+        );
+        assert!(
+            envs.iter()
+                .any(|e| e.name == "SECRET_KEY" && e.line == 3 && e.column == 23)
+        );
     }
 
     #[test]
@@ -107,7 +133,10 @@ mod tests {
 
         let envs = process(input);
 
-        assert!(envs.iter().any(|e| e.name == "API_KEY" && e.line == 2 && e.column == 19));
+        assert!(
+            envs.iter()
+                .any(|e| e.name == "API_KEY" && e.line == 2 && e.column == 19)
+        );
     }
 
     #[test]
@@ -116,7 +145,10 @@ mod tests {
 
         let envs = process(input);
 
-        assert!(envs.iter().any(|e| e.name == "API_KEY" && e.line == 2 && e.column == 26));
+        assert!(
+            envs.iter()
+                .any(|e| e.name == "API_KEY" && e.line == 2 && e.column == 26)
+        );
     }
 
     #[test]
@@ -125,7 +157,10 @@ mod tests {
 
         let envs = process(input);
 
-        assert!(envs.iter().any(|e| e.name == "API_KEY" && e.line == 3 && e.column == 10));
+        assert!(
+            envs.iter()
+                .any(|e| e.name == "API_KEY" && e.line == 3 && e.column == 10)
+        );
     }
 
     #[test]
@@ -134,7 +169,13 @@ mod tests {
 
         let envs = process(input);
 
-        assert!(envs.iter().any(|e| e.name == "MISSING_VAR_1" && e.line == 3 && e.column == 12));
-        assert!(envs.iter().any(|e| e.name == "MISSING_VAR_2" && e.line == 3 && e.column == 48));
+        assert!(
+            envs.iter()
+                .any(|e| e.name == "MISSING_VAR_1" && e.line == 3 && e.column == 12)
+        );
+        assert!(
+            envs.iter()
+                .any(|e| e.name == "MISSING_VAR_2" && e.line == 3 && e.column == 48)
+        );
     }
 }

@@ -33,5 +33,9 @@ fn finds_unused_and_missing_env_vars() {
     assert_eq!(result.unused[0].line, 1);
 
     assert!(result.missing.iter().any(|occ| occ.name == "MISSING_KEY"));
+    assert!(result
+        .missing
+        .iter()
+        .any(|occ| occ.name == "MISSING_KEY" && occ.file_path.contains("main.rs")));
     assert!(!result.missing.iter().any(|occ| occ.name == "USED_KEY"));
 }

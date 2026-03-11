@@ -1,7 +1,6 @@
 mod env_file_reader;
 mod src_file_reader;
 
-use crate::env_file_reader::EnvDefinition;
 use std::collections::HashSet;
 use std::fs;
 use std::io::{self, BufReader};
@@ -20,7 +19,7 @@ fn get_file_reader(path: &Path) -> io::Result<BufReader<fs::File>> {
 
 #[derive(Debug)]
 pub struct AnalysisResult {
-    pub unused: Vec<EnvDefinition>,
+    pub unused: Vec<env_file_reader::EnvDefinition>,
     pub missing: Vec<src_file_reader::EnvOccurrence>,
 }
 
@@ -40,7 +39,10 @@ pub fn analyze(env_file: &Path, src_dir: &Path) -> io::Result<AnalysisResult> {
 
         let path = entry.path();
         if path.is_file() && path.extension().and_then(|ext| ext.to_str()) == Some("rs") {
-            let mut envs = src_file_reader::process_src_file(get_file_reader(path)?)?;
+            let mut envs = src_file_reader::process_src_file(
+                get_file_reader(path)?,
+                path.to_str().unwrap_or(""),
+            )?;
             src_env_occurrences.append(&mut envs);
         }
     }
@@ -56,7 +58,7 @@ pub fn analyze(env_file: &Path, src_dir: &Path) -> io::Result<AnalysisResult> {
 
     let unused_env_variables = env_variables.difference(&unique_src_env_variables);
 
-    let mut unused_env_definitions: Vec<EnvDefinition> = Vec::new();
+    let mut unused_env_definitions: Vec<env_file_reader::EnvDefinition> = Vec::new();
     for env_variable in unused_env_variables {
         let definition = env_definitions.iter().find(|def| def.name == *env_variable);
         match definition {
@@ -76,7 +78,7 @@ pub fn run(env_file: &Path, src_dir: &Path) -> io::Result<()> {
 
     for env_variable in &result.unused {
         println!(
-            "Unused env variable: {} ({}:{})",
+            "Unused env variable: \n\t{} ({}:{})",
             env_variable.name,
             env_file.display(),
             env_variable.line + 1
@@ -86,8 +88,8 @@ pub fn run(env_file: &Path, src_dir: &Path) -> io::Result<()> {
 
     for occurrence in &result.missing {
         println!(
-            "Missing env variable: {} (at line {}, column {})",
-            occurrence.name, occurrence.line, occurrence.column
+            "Missing env variable: \n\t{} ({}:{}:{})",
+            occurrence.name, occurrence.file_path, occurrence.line, occurrence.column
         );
     }
 
