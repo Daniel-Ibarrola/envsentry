@@ -26,9 +26,12 @@ fn is_valid_key(key: &str) -> bool {
     chars.all(|c| c == '_' || c.is_ascii_alphanumeric())
 }
 
+/// Represents a single environment variable definition in an environment file.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct EnvDefinition {
+    /// The name of the environment variable.
     pub name: String,
+    /// The line number (0-indexed) where the definition was found.
     pub line: usize,
 }
 

@@ -1,13 +1,22 @@
+//! This module provides functionality for scanning Rust source files for environment variable usage.
+//!
+//! It uses a regular expression to find calls to `env::var`, `std::env::var`, `env!`, etc.
+
 use regex::Regex;
 use std::io;
 use std::io::BufRead;
 use std::sync::OnceLock;
 
+/// Represents an occurrence of an environment variable in a source file.
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct EnvOccurrence {
+    /// The name of the environment variable.
     pub name: String,
+    /// The path to the file where the occurrence was found.
     pub file_path: String,
+    /// The line number (1-indexed) where the occurrence starts.
     pub line: usize,
+    /// The column number (1-indexed) where the environment variable name starts.
     pub column: usize,
 }
 
@@ -19,6 +28,11 @@ fn src_env_regex() -> &'static Regex {
     })
 }
 
+/// Processes a source file and extracts all environment variable occurrences.
+///
+/// # Errors
+///
+/// Returns an `std::io::Error` if reading from the `reader` fails.
 pub fn process_src_file<R: BufRead>(
     mut reader: R,
     file_path: &str,

@@ -1,7 +1,10 @@
+//! Entry point for the envsentry command-line tool.
+
 use clap::Parser;
 use envsentry::run;
 use std::path::Path;
 
+/// Command-line arguments for envsentry.
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]
 struct Args {

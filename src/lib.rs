@@ -1,3 +1,6 @@
+//! This module provides the main functionality for analyzing environment variables
+//! in a source code directory and comparing them with an environment file.
+
 mod env_file_reader;
 mod src_file_reader;
 
@@ -17,12 +20,20 @@ fn get_file_reader(path: &Path) -> io::Result<BufReader<fs::File>> {
     Ok(BufReader::new(file))
 }
 
+/// Represents the results of an environment variable analysis.
 #[derive(Debug)]
 pub struct AnalysisResult {
+    /// Environment variables defined in the env file but not used in the source code.
     pub unused: Vec<env_file_reader::EnvDefinition>,
+    /// Environment variables used in the source code but not defined in the env file.
     pub missing: Vec<src_file_reader::EnvOccurrence>,
 }
 
+/// Analyzes the source directory and compares environment variable usage with the provided env file.
+///
+/// # Errors
+///
+/// Returns an `io::Result` if there are issues reading files or walking the directory.
 pub fn analyze(env_file: &Path, src_dir: &Path) -> io::Result<AnalysisResult> {
     let (env_variables, env_definitions) =
         env_file_reader::process_env_file(get_file_reader(env_file)?)?;
@@ -73,6 +84,11 @@ pub fn analyze(env_file: &Path, src_dir: &Path) -> io::Result<AnalysisResult> {
     })
 }
 
+/// Runs the analysis and prints the results to standard output.
+///
+/// # Errors
+///
+/// Returns an `io::Result` if there are issues during the analysis process.
 pub fn run(env_file: &Path, src_dir: &Path) -> io::Result<()> {
     let result = analyze(env_file, src_dir)?;
 
