@@ -11,7 +11,13 @@ A command-line tool for analyzing environment variables in Rust source code and 
 
 ## Installation
 
-Since `envsentry` is a Rust project, you can build it from source using `cargo`:
+You can install `envsentry` directly from [crates.io](https://crates.io) using `cargo`:
+
+```bash
+cargo install envsentry
+```
+
+Alternatively, you can build it from source:
 
 ```bash
 git clone https://github.com/yourusername/envsentry.git

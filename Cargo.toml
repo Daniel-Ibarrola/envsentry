@@ -2,12 +2,12 @@
 name = "envsentry"
 version = "0.1.0"
 edition = "2024"
-description = "A command-line tool for analyzing environment variables in Rust source code"
+description = "CLI tool for finding missing and unused environment variables in Rust projects"
 license = "MIT"
-repository = "https://github.com/Daniel-Ibarrola/envsentry"
 readme = "README.md"
-keywords = ["cli", "env"]
-categories = ["command-line-utilities"]
+repository = "https://github.com/yourusername/envsentry"
+keywords = ["cli", "env", "dotenv", "rust", "audit"]
+categories = ["command-line-utilities", "development-tools"]
 
 [dependencies]
 clap = { version = "4.5.60", features = ["derive"] }
