@@ -86,12 +86,16 @@ mod tests {
         let envs = process(input);
 
         assert!(
-            envs.iter()
-                .any(|e| e.name == "FOO" && e.line == 2 && e.column == 15 && e.file_path == "test.rs")
+            envs.iter().any(|e| e.name == "FOO"
+                && e.line == 2
+                && e.column == 15
+                && e.file_path == "test.rs")
         );
         assert!(
-            envs.iter()
-                .any(|e| e.name == "BAR" && e.line == 3 && e.column == 15 && e.file_path == "test.rs")
+            envs.iter().any(|e| e.name == "BAR"
+                && e.line == 3
+                && e.column == 15
+                && e.file_path == "test.rs")
         );
     }
 
