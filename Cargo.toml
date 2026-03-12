@@ -1,6 +1,6 @@
 [package]
 name = "envsentry"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2024"
 description = "CLI tool for finding missing and unused environment variables in Rust projects"
 license = "MIT"

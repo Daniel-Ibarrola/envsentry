@@ -6,6 +6,8 @@ on:
 env:
   CARGO_TERM_COLOR: always
 
+permissions: {}
+
 jobs:
   test:
     name: Run Tests
