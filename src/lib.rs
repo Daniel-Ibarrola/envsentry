@@ -83,7 +83,7 @@ pub fn analyze(env_file: &Path, src_dir: &Path) -> io::Result<AnalysisResult> {
     let empty_vars = env_definitions
         .iter()
         .filter(|def| def.value.is_empty())
-        .map(|def| def.clone())
+        .cloned()
         .collect::<Vec<_>>();
 
     Ok(AnalysisResult {
