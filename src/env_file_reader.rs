@@ -33,6 +33,7 @@ pub struct EnvDefinition {
     pub name: String,
     /// The line number (0-indexed) where the definition was found.
     pub line: usize,
+    pub value: String,
 }
 
 /// Processes an environment file and returns a set of unique environment variable keys.
@@ -57,7 +58,7 @@ pub fn process_env_file<R: BufRead>(
             continue;
         }
 
-        if let Some((key, _value)) = trimmed.split_once('=') {
+        if let Some((key, value)) = trimmed.split_once('=') {
             let normalized_key = key
                 .trim_start_matches('\u{FEFF}')
                 .trim_start_matches("export ")
@@ -68,6 +69,7 @@ pub fn process_env_file<R: BufRead>(
                 env_definitions.push(EnvDefinition {
                     name: normalized_key.to_string(),
                     line: line_number,
+                    value: value.to_string(),
                 });
             }
         }

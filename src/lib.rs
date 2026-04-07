@@ -25,6 +25,8 @@ fn get_file_reader(path: &Path) -> io::Result<BufReader<fs::File>> {
 pub struct AnalysisResult {
     /// Environment variables defined in the env file but not used in the source code.
     pub unused: Vec<env_file_reader::EnvDefinition>,
+    // Environment variables defined in the env file but with empty values.
+    pub empty_vars: Vec<env_file_reader::EnvDefinition>,
     /// Environment variables used in the source code but not defined in the env file.
     pub missing: Vec<src_file_reader::EnvOccurrence>,
 }
@@ -78,9 +80,16 @@ pub fn analyze(env_file: &Path, src_dir: &Path) -> io::Result<AnalysisResult> {
         }
     }
 
+    let empty_vars = env_definitions
+        .iter()
+        .filter(|def| def.value.is_empty())
+        .map(|def| def.clone())
+        .collect::<Vec<_>>();
+
     Ok(AnalysisResult {
         unused: unused_env_definitions,
         missing: missing_env_occurrences,
+        empty_vars,
     })
 }
 
@@ -95,6 +104,16 @@ pub fn run(env_file: &Path, src_dir: &Path) -> io::Result<()> {
     for env_variable in &result.unused {
         println!(
             "Unused env variable: \n\t{} ({}:{})",
+            env_variable.name,
+            env_file.display(),
+            env_variable.line + 1
+        );
+    }
+    println!();
+
+    for env_variable in &result.empty_vars {
+        println!(
+            "Empty env variable: \n\t{} ({}:{})",
             env_variable.name,
             env_file.display(),
             env_variable.line + 1
