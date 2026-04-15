@@ -3,12 +3,16 @@
 
 mod env_file_reader;
 mod src_file_reader;
+mod diagnostics;
 
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::io::{self, BufReader};
 use std::path::Path;
+use std::sync::Arc;
 use walkdir::WalkDir;
+use crate::diagnostics::{EmptyEnvError, MissingEnvError, UnusedEnvError};
+use miette::{NamedSource, Report};
 
 fn get_file_reader(path: &Path) -> io::Result<BufReader<fs::File>> {
     let file = fs::File::open(path).map_err(|e| {
@@ -101,32 +105,41 @@ pub fn analyze(env_file: &Path, src_dir: &Path) -> io::Result<AnalysisResult> {
 pub fn run(env_file: &Path, src_dir: &Path) -> io::Result<()> {
     let result = analyze(env_file, src_dir)?;
 
+    let contents = Arc::new(fs::read_to_string(env_file)?);
     for env_variable in &result.unused {
-        println!(
-            "Unused env variable: \n\t{} ({}:{})",
-            env_variable.name,
-            env_file.display(),
-            env_variable.line + 1
-        );
+        let err = UnusedEnvError {
+            name: env_variable.name.clone(),
+            location: (env_variable.span_start, env_variable.span_len).into(),
+            src: NamedSource::new(env_file.to_string_lossy().into_owned(), contents.clone()),
+        };
+        eprintln!("{:?}", Report::new(err));
     }
-    println!();
 
     for env_variable in &result.empty_vars {
-        println!(
-            "Empty env variable: \n\t{} ({}:{})",
-            env_variable.name,
-            env_file.display(),
-            env_variable.line + 1
-        );
+        let err = EmptyEnvError {
+            name: env_variable.name.clone(),
+            location: (env_variable.span_start, env_variable.span_len).into(),
+            src: NamedSource::new(env_file.to_string_lossy().into_owned(), contents.clone()),
+        };
+        eprintln!("{:?}", Report::new(err));
     }
-    println!();
 
+    let mut source_cache: HashMap<String, Arc<String>> = HashMap::new();
     for occurrence in &result.missing {
-        println!(
-            "Missing env variable: \n\t{} ({}:{}:{})",
-            occurrence.name, occurrence.file_path, occurrence.line, occurrence.column
-        );
-    }
+        let contents = source_cache
+            .entry(occurrence.file_path.clone())
+            .or_insert_with(|| {
+                Arc::new(fs::read_to_string(&occurrence.file_path).unwrap_or_default())
+            })
+            .clone();
 
+        let err = MissingEnvError {
+            name: occurrence.name.clone(),
+            location: (occurrence.span_start, occurrence.span_len).into(),
+            src: NamedSource::new(occurrence.file_path.clone(), contents),
+        };
+
+        eprintln!("{:?}", Report::new(err));
+    }
     Ok(())
 }

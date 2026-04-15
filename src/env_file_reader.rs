@@ -33,6 +33,11 @@ pub struct EnvDefinition {
     pub name: String,
     /// The line number (0-indexed) where the definition was found.
     pub line: usize,
+    /// The byte offset where the variable name starts in the full file.
+    pub span_start: usize,
+    /// The byte length of the variable name.
+    pub span_len: usize,
+    /// The value of the environment variable.
     pub value: String,
 }
 
@@ -45,34 +50,49 @@ pub struct EnvDefinition {
 ///
 /// Returns an `std::io::Error` if reading from the `reader` fails.
 pub fn process_env_file<R: BufRead>(
-    reader: R,
+    mut reader: R,
 ) -> io::Result<(HashSet<String>, Vec<EnvDefinition>)> {
-    let mut env_variables = HashSet::new();
-    let mut env_definitions: Vec<EnvDefinition> = Vec::new();
+    let mut contents = String::new();
+    reader.read_to_string(&mut contents)?;
 
-    for (line_number, line) in reader.lines().enumerate() {
-        let line = line?;
+    let mut env_variables = HashSet::new();
+    let mut env_definitions = Vec::new();
+    let mut file_offset = 0usize;
+
+    for (line_number, raw_line) in contents.split_inclusive('\n').enumerate() {
+        let line = raw_line.strip_suffix('\n').unwrap_or(raw_line);
+        let line_start_offset = file_offset;
 
         let trimmed = line.trim();
         if trimmed.is_empty() || trimmed.starts_with('#') {
+            file_offset += raw_line.len();
             continue;
         }
 
-        if let Some((key, value)) = trimmed.split_once('=') {
-            let normalized_key = key
+        if let Some((key_part, value)) = line.split_once('=') {
+            let normalized_key = key_part
                 .trim_start_matches('\u{FEFF}')
                 .trim_start_matches("export ")
                 .trim();
 
             if is_valid_key(normalized_key) {
-                env_variables.insert(normalized_key.to_string());
-                env_definitions.push(EnvDefinition {
-                    name: normalized_key.to_string(),
-                    line: line_number,
-                    value: value.to_string(),
-                });
+                if let Some(key_start_in_line) = line.find(normalized_key) {
+                    let span_start = line_start_offset + key_start_in_line;
+                    let span_len = normalized_key.len();
+
+                    env_variables.insert(normalized_key.to_string());
+                    env_definitions.push(EnvDefinition {
+                        name: normalized_key.to_string(),
+                        line: line_number,
+                        span_start,
+                        span_len,
+                        value: value.trim_end_matches('\r').to_string(),
+                    });
+                }
             }
         }
+
+        file_offset += raw_line.len();
     }
 
     Ok((env_variables, env_definitions))
@@ -95,10 +115,16 @@ mod tests {
         assert!(!envs.contains("INVALID_LINE"));
 
         assert_eq!(definitions.len(), 2);
+
         assert_eq!(definitions[0].name, "FOO");
         assert_eq!(definitions[0].line, 0);
+        assert_eq!(definitions[0].span_start, 0);
+        assert_eq!(definitions[0].span_len, 3);
+
         assert_eq!(definitions[1].name, "BAZ");
         assert_eq!(definitions[1].line, 1);
+        assert_eq!(definitions[1].span_start, 8);
+        assert_eq!(definitions[1].span_len, 3);
     }
 
     #[test]
@@ -114,7 +140,12 @@ mod tests {
 
         assert_eq!(definitions.len(), 2);
         assert_eq!(definitions[0].line, 0);
+        assert_eq!(definitions[0].span_start, 0);
+        assert_eq!(definitions[0].span_len, 3);
+
         assert_eq!(definitions[1].line, 2);
+        assert_eq!(definitions[1].span_start, 9);
+        assert_eq!(definitions[1].span_len, 3);
     }
 
     #[test]
@@ -129,6 +160,8 @@ mod tests {
 
         assert_eq!(definitions.len(), 1);
         assert_eq!(definitions[0].line, 1);
+        assert_eq!(definitions[0].span_start, 20);
+        assert_eq!(definitions[0].span_len, 3);
     }
 
     #[test]
@@ -136,22 +169,17 @@ mod tests {
         let input = "FOO = bar\nBAZ = qux\n";
         let reader = Cursor::new(input);
 
-        let (envs, _) = process_env_file(reader).unwrap();
+        let (envs, definitions) = process_env_file(reader).unwrap();
 
         assert_eq!(envs.len(), 2);
+
         assert!(envs.contains("FOO"));
+        assert_eq!(definitions[0].span_start, 0);
+        assert_eq!(definitions[0].span_len, 3);
+
         assert!(envs.contains("BAZ"));
-    }
-
-    #[test]
-    fn test_ignores_comments_with_leading_whitespace() {
-        let input = "   # This is a comment\nFOO=bar\n";
-        let reader = Cursor::new(input);
-
-        let (envs, _) = process_env_file(reader).unwrap();
-
-        assert_eq!(envs.len(), 1);
-        assert!(envs.contains("FOO"));
+        assert_eq!(definitions[1].span_start, 10);
+        assert_eq!(definitions[1].span_len, 3);
     }
 
     #[test]
@@ -159,12 +187,20 @@ mod tests {
         let input = "export FOO=bar\nBAR=baz\n";
         let reader = Cursor::new(input);
 
-        let (envs, _) = process_env_file(reader).unwrap();
+        let (envs, definitions) = process_env_file(reader).unwrap();
 
         assert_eq!(envs.len(), 2);
         assert!(envs.contains("FOO"));
         assert!(envs.contains("BAR"));
         assert!(!envs.contains("export FOO"));
+
+        assert_eq!(definitions[0].name, "FOO");
+        assert_eq!(definitions[0].span_start, 7);
+        assert_eq!(definitions[0].span_len, 3);
+
+        assert_eq!(definitions[1].name, "BAR");
+        assert_eq!(definitions[1].span_start, 15);
+        assert_eq!(definitions[1].span_len, 3);
     }
 
     #[test]

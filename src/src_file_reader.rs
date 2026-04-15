@@ -18,6 +18,10 @@ pub struct EnvOccurrence {
     pub line: usize,
     /// The column number (1-indexed) where the environment variable name starts.
     pub column: usize,
+    /// The byte offset where the occurrence starts in the full file.
+    pub span_start: usize,
+    /// The byte offset of the variable name.
+    pub span_len: usize,
 }
 
 fn src_env_regex() -> &'static Regex {
@@ -52,17 +56,20 @@ pub fn process_src_file<R: BufRead>(
 
     for caps in re.captures_iter(&content) {
         let name_match = caps.get(1).unwrap();
-        let offset = name_match.start();
+        let span_start = name_match.start();
+        let span_len = name_match.as_str().len();
         let name = name_match.as_str().to_string();
 
-        let line = line_starts.binary_search(&offset).unwrap_or_else(|x| x - 1);
-        let column = offset - line_starts[line] + 1;
+        let line = line_starts.binary_search(&span_start).unwrap_or_else(|x| x - 1);
+        let column = span_start - line_starts[line] + 1;
 
         env_occurrences.push(EnvOccurrence {
             name,
             file_path: file_path.to_string(),
             line: line + 1,
             column,
+            span_start,
+            span_len,
         });
     }
 
@@ -89,12 +96,16 @@ mod tests {
             envs.iter().any(|e| e.name == "FOO"
                 && e.line == 2
                 && e.column == 15
+                && e.span_start == 26
+                && e.span_len == 3
                 && e.file_path == "test.rs")
         );
         assert!(
             envs.iter().any(|e| e.name == "BAR"
                 && e.line == 3
                 && e.column == 15
+                && e.span_start == 47
+                && e.span_len == 3
                 && e.file_path == "test.rs")
         );
     }
@@ -107,12 +118,22 @@ mod tests {
         let envs = process(input);
 
         assert!(
-            envs.iter()
-                .any(|e| e.name == "API_KEY" && e.line == 2 && e.column == 20)
+            envs.iter().any(|e| {
+                e.name == "API_KEY"
+                    && e.line == 2
+                    && e.column == 20
+                    && e.span_start == 31
+                    && e.span_len == 7
+            })
         );
         assert!(
-            envs.iter()
-                .any(|e| e.name == "SECRET_KEY" && e.line == 3 && e.column == 20)
+            envs.iter().any(|e| {
+                e.name == "SECRET_KEY"
+                    && e.line == 3
+                    && e.column == 20
+                    && e.span_start == 61
+                    && e.span_len == 10
+            })
         );
     }
 
@@ -123,8 +144,13 @@ mod tests {
         let envs = process(input);
 
         assert!(
-            envs.iter()
-                .any(|e| e.name == "API_KEY" && e.line == 3 && e.column == 10)
+            envs.iter().any(|e| {
+                e.name == "API_KEY"
+                    && e.line == 3
+                    && e.column == 10
+                    && e.span_start == 40
+                    && e.span_len == 7
+            })
         );
     }
 
@@ -136,12 +162,22 @@ mod tests {
         let envs = process(input);
 
         assert!(
-            envs.iter()
-                .any(|e| e.name == "API_KEY" && e.line == 2 && e.column == 18)
+            envs.iter().any(|e| {
+                e.name == "API_KEY"
+                    && e.line == 2
+                    && e.column == 18
+                    && e.span_start == 29
+                    && e.span_len == 7
+            })
         );
         assert!(
-            envs.iter()
-                .any(|e| e.name == "SECRET_KEY" && e.line == 3 && e.column == 23)
+            envs.iter().any(|e| {
+                e.name == "SECRET_KEY"
+                    && e.line == 3
+                    && e.column == 23
+                    && e.span_start == 62
+                    && e.span_len == 10
+            })
         );
     }
 
@@ -152,8 +188,13 @@ mod tests {
         let envs = process(input);
 
         assert!(
-            envs.iter()
-                .any(|e| e.name == "API_KEY" && e.line == 2 && e.column == 19)
+            envs.iter().any(|e| {
+                e.name == "API_KEY"
+                    && e.line == 2
+                    && e.column == 19
+                    && e.span_start == 30
+                    && e.span_len == 7
+            })
         );
     }
 
@@ -164,8 +205,13 @@ mod tests {
         let envs = process(input);
 
         assert!(
-            envs.iter()
-                .any(|e| e.name == "API_KEY" && e.line == 2 && e.column == 26)
+            envs.iter().any(|e| {
+                e.name == "API_KEY"
+                    && e.line == 2
+                    && e.column == 26
+                    && e.span_start == 37
+                    && e.span_len == 7
+            })
         );
     }
 
@@ -176,8 +222,13 @@ mod tests {
         let envs = process(input);
 
         assert!(
-            envs.iter()
-                .any(|e| e.name == "API_KEY" && e.line == 3 && e.column == 10)
+            envs.iter().any(|e| {
+                e.name == "API_KEY"
+                    && e.line == 3
+                    && e.column == 10
+                    && e.span_start == 35
+                    && e.span_len == 7
+            })
         );
     }
 
@@ -188,12 +239,22 @@ mod tests {
         let envs = process(input);
 
         assert!(
-            envs.iter()
-                .any(|e| e.name == "MISSING_VAR_1" && e.line == 3 && e.column == 12)
+            envs.iter().any(|e| {
+                e.name == "MISSING_VAR_1"
+                    && e.line == 3
+                    && e.column == 12
+                    && e.span_start == 44
+                    && e.span_len == 13
+            })
         );
         assert!(
-            envs.iter()
-                .any(|e| e.name == "MISSING_VAR_2" && e.line == 3 && e.column == 48)
+            envs.iter().any(|e| {
+                e.name == "MISSING_VAR_2"
+                    && e.line == 3
+                    && e.column == 48
+                    && e.span_start == 80
+                    && e.span_len == 13
+            })
         );
     }
 }
