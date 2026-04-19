@@ -75,20 +75,20 @@ pub fn process_env_file<R: BufRead>(
                 .trim_start_matches("export ")
                 .trim();
 
-            if is_valid_key(normalized_key) {
-                if let Some(key_start_in_line) = line.find(normalized_key) {
-                    let span_start = line_start_offset + key_start_in_line;
-                    let span_len = normalized_key.len();
+            if is_valid_key(normalized_key)
+                && let Some(key_start_in_line) = line.find(normalized_key)
+            {
+                let span_start = line_start_offset + key_start_in_line;
+                let span_len = normalized_key.len();
 
-                    env_variables.insert(normalized_key.to_string());
-                    env_definitions.push(EnvDefinition {
-                        name: normalized_key.to_string(),
-                        line: line_number,
-                        span_start,
-                        span_len,
-                        value: value.trim_end_matches('\r').to_string(),
-                    });
-                }
+                env_variables.insert(normalized_key.to_string());
+                env_definitions.push(EnvDefinition {
+                    name: normalized_key.to_string(),
+                    line: line_number,
+                    span_start,
+                    span_len,
+                    value: value.trim_end_matches('\r').to_string(),
+                });
             }
         }
 

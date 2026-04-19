@@ -110,7 +110,7 @@ pub fn run(env_file: &Path, src_dir: &Path) -> io::Result<()> {
         let err = UnusedEnvError {
             name: env_variable.name.clone(),
             location: (env_variable.span_start, env_variable.span_len).into(),
-            src: NamedSource::new(env_file.to_string_lossy().into_owned(), contents.clone()),
+            src: NamedSource::new(env_file.to_string_lossy(), contents.clone()),
         };
         eprintln!("{:?}", Report::new(err));
     }
@@ -119,7 +119,7 @@ pub fn run(env_file: &Path, src_dir: &Path) -> io::Result<()> {
         let err = EmptyEnvError {
             name: env_variable.name.clone(),
             location: (env_variable.span_start, env_variable.span_len).into(),
-            src: NamedSource::new(env_file.to_string_lossy().into_owned(), contents.clone()),
+            src: NamedSource::new(env_file.to_string_lossy(), contents.clone()),
         };
         eprintln!("{:?}", Report::new(err));
     }
