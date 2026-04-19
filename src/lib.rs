@@ -1,18 +1,18 @@
 //! This module provides the main functionality for analyzing environment variables
 //! in a source code directory and comparing them with an environment file.
 
+mod diagnostics;
 mod env_file_reader;
 mod src_file_reader;
-mod diagnostics;
 
+use crate::diagnostics::{EmptyEnvError, MissingEnvError, UnusedEnvError};
+use miette::{NamedSource, Report};
 use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::io::{self, BufReader};
 use std::path::Path;
 use std::sync::Arc;
 use walkdir::WalkDir;
-use crate::diagnostics::{EmptyEnvError, MissingEnvError, UnusedEnvError};
-use miette::{NamedSource, Report};
 
 fn get_file_reader(path: &Path) -> io::Result<BufReader<fs::File>> {
     let file = fs::File::open(path).map_err(|e| {

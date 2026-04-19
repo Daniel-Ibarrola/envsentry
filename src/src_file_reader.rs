@@ -60,7 +60,9 @@ pub fn process_src_file<R: BufRead>(
         let span_len = name_match.as_str().len();
         let name = name_match.as_str().to_string();
 
-        let line = line_starts.binary_search(&span_start).unwrap_or_else(|x| x - 1);
+        let line = line_starts
+            .binary_search(&span_start)
+            .unwrap_or_else(|x| x - 1);
         let column = span_start - line_starts[line] + 1;
 
         env_occurrences.push(EnvOccurrence {
@@ -92,22 +94,18 @@ mod tests {
 
         let envs = process(input);
 
-        assert!(
-            envs.iter().any(|e| e.name == "FOO"
-                && e.line == 2
-                && e.column == 15
-                && e.span_start == 26
-                && e.span_len == 3
-                && e.file_path == "test.rs")
-        );
-        assert!(
-            envs.iter().any(|e| e.name == "BAR"
-                && e.line == 3
-                && e.column == 15
-                && e.span_start == 47
-                && e.span_len == 3
-                && e.file_path == "test.rs")
-        );
+        assert!(envs.iter().any(|e| e.name == "FOO"
+            && e.line == 2
+            && e.column == 15
+            && e.span_start == 26
+            && e.span_len == 3
+            && e.file_path == "test.rs"));
+        assert!(envs.iter().any(|e| e.name == "BAR"
+            && e.line == 3
+            && e.column == 15
+            && e.span_start == 47
+            && e.span_len == 3
+            && e.file_path == "test.rs"));
     }
 
     #[test]
@@ -117,24 +115,20 @@ mod tests {
 
         let envs = process(input);
 
-        assert!(
-            envs.iter().any(|e| {
-                e.name == "API_KEY"
-                    && e.line == 2
-                    && e.column == 20
-                    && e.span_start == 31
-                    && e.span_len == 7
-            })
-        );
-        assert!(
-            envs.iter().any(|e| {
-                e.name == "SECRET_KEY"
-                    && e.line == 3
-                    && e.column == 20
-                    && e.span_start == 61
-                    && e.span_len == 10
-            })
-        );
+        assert!(envs.iter().any(|e| {
+            e.name == "API_KEY"
+                && e.line == 2
+                && e.column == 20
+                && e.span_start == 31
+                && e.span_len == 7
+        }));
+        assert!(envs.iter().any(|e| {
+            e.name == "SECRET_KEY"
+                && e.line == 3
+                && e.column == 20
+                && e.span_start == 61
+                && e.span_len == 10
+        }));
     }
 
     #[test]
@@ -143,15 +137,13 @@ mod tests {
 
         let envs = process(input);
 
-        assert!(
-            envs.iter().any(|e| {
-                e.name == "API_KEY"
-                    && e.line == 3
-                    && e.column == 10
-                    && e.span_start == 40
-                    && e.span_len == 7
-            })
-        );
+        assert!(envs.iter().any(|e| {
+            e.name == "API_KEY"
+                && e.line == 3
+                && e.column == 10
+                && e.span_start == 40
+                && e.span_len == 7
+        }));
     }
 
     #[test]
@@ -161,24 +153,20 @@ mod tests {
 
         let envs = process(input);
 
-        assert!(
-            envs.iter().any(|e| {
-                e.name == "API_KEY"
-                    && e.line == 2
-                    && e.column == 18
-                    && e.span_start == 29
-                    && e.span_len == 7
-            })
-        );
-        assert!(
-            envs.iter().any(|e| {
-                e.name == "SECRET_KEY"
-                    && e.line == 3
-                    && e.column == 23
-                    && e.span_start == 62
-                    && e.span_len == 10
-            })
-        );
+        assert!(envs.iter().any(|e| {
+            e.name == "API_KEY"
+                && e.line == 2
+                && e.column == 18
+                && e.span_start == 29
+                && e.span_len == 7
+        }));
+        assert!(envs.iter().any(|e| {
+            e.name == "SECRET_KEY"
+                && e.line == 3
+                && e.column == 23
+                && e.span_start == 62
+                && e.span_len == 10
+        }));
     }
 
     #[test]
@@ -187,15 +175,13 @@ mod tests {
 
         let envs = process(input);
 
-        assert!(
-            envs.iter().any(|e| {
-                e.name == "API_KEY"
-                    && e.line == 2
-                    && e.column == 19
-                    && e.span_start == 30
-                    && e.span_len == 7
-            })
-        );
+        assert!(envs.iter().any(|e| {
+            e.name == "API_KEY"
+                && e.line == 2
+                && e.column == 19
+                && e.span_start == 30
+                && e.span_len == 7
+        }));
     }
 
     #[test]
@@ -204,15 +190,13 @@ mod tests {
 
         let envs = process(input);
 
-        assert!(
-            envs.iter().any(|e| {
-                e.name == "API_KEY"
-                    && e.line == 2
-                    && e.column == 26
-                    && e.span_start == 37
-                    && e.span_len == 7
-            })
-        );
+        assert!(envs.iter().any(|e| {
+            e.name == "API_KEY"
+                && e.line == 2
+                && e.column == 26
+                && e.span_start == 37
+                && e.span_len == 7
+        }));
     }
 
     #[test]
@@ -221,15 +205,13 @@ mod tests {
 
         let envs = process(input);
 
-        assert!(
-            envs.iter().any(|e| {
-                e.name == "API_KEY"
-                    && e.line == 3
-                    && e.column == 10
-                    && e.span_start == 35
-                    && e.span_len == 7
-            })
-        );
+        assert!(envs.iter().any(|e| {
+            e.name == "API_KEY"
+                && e.line == 3
+                && e.column == 10
+                && e.span_start == 35
+                && e.span_len == 7
+        }));
     }
 
     #[test]
@@ -238,23 +220,19 @@ mod tests {
 
         let envs = process(input);
 
-        assert!(
-            envs.iter().any(|e| {
-                e.name == "MISSING_VAR_1"
-                    && e.line == 3
-                    && e.column == 12
-                    && e.span_start == 44
-                    && e.span_len == 13
-            })
-        );
-        assert!(
-            envs.iter().any(|e| {
-                e.name == "MISSING_VAR_2"
-                    && e.line == 3
-                    && e.column == 48
-                    && e.span_start == 80
-                    && e.span_len == 13
-            })
-        );
+        assert!(envs.iter().any(|e| {
+            e.name == "MISSING_VAR_1"
+                && e.line == 3
+                && e.column == 12
+                && e.span_start == 44
+                && e.span_len == 13
+        }));
+        assert!(envs.iter().any(|e| {
+            e.name == "MISSING_VAR_2"
+                && e.line == 3
+                && e.column == 48
+                && e.span_start == 80
+                && e.span_len == 13
+        }));
     }
 }

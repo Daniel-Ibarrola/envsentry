@@ -3,8 +3,8 @@
 //! This module defines the error structures used to report missing, unused,
 //! or empty environment variables, integrating with `miette` for pretty-printed diagnostics.
 
-use std::sync::Arc;
 use miette::{Diagnostic, NamedSource, SourceSpan};
+use std::sync::Arc;
 use thiserror::Error;
 
 /// Error returned when an environment variable used in the source code is missing from the environment file.
