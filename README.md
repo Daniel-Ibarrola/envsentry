@@ -59,17 +59,7 @@ It supports standard `.env` file formats, including:
 
 ## Example Output
 
-```text
-Running envsentry...
-Environment file: .env
-Source directory: ./src
-
-Unused env variable: 
-	DEBUG_MODE (.env:5)
-
-Missing env variable: 
-	API_SECRET (./src/auth.rs:42:25)
-```
+![Example output showing miette diagnostics](assets/example-output.svg)
 
 ## Testing
 
