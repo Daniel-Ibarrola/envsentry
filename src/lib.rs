@@ -9,20 +9,10 @@ use crate::diagnostics::{EmptyEnvError, MissingEnvError, UnusedEnvError};
 use miette::{NamedSource, Report};
 use std::collections::{HashMap, HashSet};
 use std::fs;
-use std::io::{self, BufReader};
+use std::io::{self, Cursor};
 use std::path::Path;
 use std::sync::Arc;
 use walkdir::WalkDir;
-
-fn get_file_reader(path: &Path) -> io::Result<BufReader<fs::File>> {
-    let file = fs::File::open(path).map_err(|e| {
-        io::Error::new(
-            e.kind(),
-            format!("failed to open {}: {}", path.display(), e),
-        )
-    })?;
-    Ok(BufReader::new(file))
-}
 
 /// Represents the results of an environment variable analysis.
 #[derive(Debug)]
@@ -33,6 +23,10 @@ pub struct AnalysisResult {
     pub empty_vars: Vec<env_file_reader::EnvDefinition>,
     /// Environment variables used in the source code but not defined in the env file.
     pub missing: Vec<src_file_reader::EnvOccurrence>,
+    /// The raw contents of the env file.
+    pub env_file_contents: Arc<String>,
+    /// Cached source file contents keyed by file path.
+    pub source_cache: HashMap<String, Arc<String>>,
 }
 
 /// Analyzes the source directory and compares environment variable usage with the provided env file.
@@ -41,9 +35,17 @@ pub struct AnalysisResult {
 ///
 /// Returns an `io::Result` if there are issues reading files or walking the directory.
 pub fn analyze(env_file: &Path, src_dir: &Path) -> io::Result<AnalysisResult> {
+    let env_file_contents = Arc::new(fs::read_to_string(env_file).map_err(|e| {
+        io::Error::new(
+            e.kind(),
+            format!("failed to open {}: {}", env_file.display(), e),
+        )
+    })?);
     let (env_variables, env_definitions) =
-        env_file_reader::process_env_file(get_file_reader(env_file)?)?;
+        env_file_reader::process_env_file(Cursor::new(env_file_contents.as_bytes()))?;
+
     let mut src_env_occurrences = Vec::new();
+    let mut source_cache: HashMap<String, Arc<String>> = HashMap::new();
 
     for entry in WalkDir::new(src_dir) {
         let entry = entry.map_err(|e| {
@@ -56,11 +58,19 @@ pub fn analyze(env_file: &Path, src_dir: &Path) -> io::Result<AnalysisResult> {
 
         let path = entry.path();
         if path.is_file() && path.extension().and_then(|ext| ext.to_str()) == Some("rs") {
-            let mut envs = src_file_reader::process_src_file(
-                get_file_reader(path)?,
-                path.to_str().unwrap_or(""),
-            )?;
-            src_env_occurrences.append(&mut envs);
+            let path_str = path.to_str().unwrap_or("").to_string();
+            let contents = Arc::new(fs::read_to_string(path).map_err(|e| {
+                io::Error::new(
+                    e.kind(),
+                    format!("failed to open {}: {}", path.display(), e),
+                )
+            })?);
+            let mut envs =
+                src_file_reader::process_src_file(Cursor::new(contents.as_bytes()), &path_str)?;
+            if !envs.is_empty() {
+                src_env_occurrences.append(&mut envs);
+                source_cache.insert(path_str, contents);
+            }
         }
     }
 
@@ -94,6 +104,8 @@ pub fn analyze(env_file: &Path, src_dir: &Path) -> io::Result<AnalysisResult> {
         unused: unused_env_definitions,
         missing: missing_env_occurrences,
         empty_vars,
+        env_file_contents,
+        source_cache,
     })
 }
 
@@ -105,12 +117,11 @@ pub fn analyze(env_file: &Path, src_dir: &Path) -> io::Result<AnalysisResult> {
 pub fn run(env_file: &Path, src_dir: &Path) -> io::Result<()> {
     let result = analyze(env_file, src_dir)?;
 
-    let contents = Arc::new(fs::read_to_string(env_file)?);
     for env_variable in &result.unused {
         let err = UnusedEnvError {
             name: env_variable.name.clone(),
             location: (env_variable.span_start, env_variable.span_len).into(),
-            src: NamedSource::new(env_file.to_string_lossy(), contents.clone()),
+            src: NamedSource::new(env_file.to_string_lossy(), result.env_file_contents.clone()),
         };
         eprintln!("{:?}", Report::new(err));
     }
@@ -119,19 +130,17 @@ pub fn run(env_file: &Path, src_dir: &Path) -> io::Result<()> {
         let err = EmptyEnvError {
             name: env_variable.name.clone(),
             location: (env_variable.span_start, env_variable.span_len).into(),
-            src: NamedSource::new(env_file.to_string_lossy(), contents.clone()),
+            src: NamedSource::new(env_file.to_string_lossy(), result.env_file_contents.clone()),
         };
         eprintln!("{:?}", Report::new(err));
     }
 
-    let mut source_cache: HashMap<String, Arc<String>> = HashMap::new();
     for occurrence in &result.missing {
-        let contents = source_cache
-            .entry(occurrence.file_path.clone())
-            .or_insert_with(|| {
-                Arc::new(fs::read_to_string(&occurrence.file_path).unwrap_or_default())
-            })
-            .clone();
+        let contents = result
+            .source_cache
+            .get(&occurrence.file_path)
+            .cloned()
+            .unwrap_or_default();
 
         let err = MissingEnvError {
             name: occurrence.name.clone(),
