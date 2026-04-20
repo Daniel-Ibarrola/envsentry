@@ -36,7 +36,10 @@ pub struct AnalysisResult {
 /// Returns an `io::Result` if there are issues reading files or walking the directory.
 pub fn analyze(env_file: &Path, src_dir: &Path) -> io::Result<AnalysisResult> {
     let env_file_contents = Arc::new(fs::read_to_string(env_file).map_err(|e| {
-        io::Error::new(e.kind(), format!("failed to open {}: {}", env_file.display(), e))
+        io::Error::new(
+            e.kind(),
+            format!("failed to open {}: {}", env_file.display(), e),
+        )
     })?);
     let (env_variables, env_definitions) =
         env_file_reader::process_env_file(Cursor::new(env_file_contents.as_bytes()))?;
@@ -57,12 +60,13 @@ pub fn analyze(env_file: &Path, src_dir: &Path) -> io::Result<AnalysisResult> {
         if path.is_file() && path.extension().and_then(|ext| ext.to_str()) == Some("rs") {
             let path_str = path.to_str().unwrap_or("").to_string();
             let contents = Arc::new(fs::read_to_string(path).map_err(|e| {
-                io::Error::new(e.kind(), format!("failed to open {}: {}", path.display(), e))
+                io::Error::new(
+                    e.kind(),
+                    format!("failed to open {}: {}", path.display(), e),
+                )
             })?);
-            let mut envs = src_file_reader::process_src_file(
-                Cursor::new(contents.as_bytes()),
-                &path_str,
-            )?;
+            let mut envs =
+                src_file_reader::process_src_file(Cursor::new(contents.as_bytes()), &path_str)?;
             if !envs.is_empty() {
                 src_env_occurrences.append(&mut envs);
                 source_cache.insert(path_str, contents);
@@ -132,7 +136,8 @@ pub fn run(env_file: &Path, src_dir: &Path) -> io::Result<()> {
     }
 
     for occurrence in &result.missing {
-        let contents = result.source_cache
+        let contents = result
+            .source_cache
             .get(&occurrence.file_path)
             .cloned()
             .unwrap_or_default();
