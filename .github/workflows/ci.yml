@@ -38,3 +38,6 @@ jobs:
 
     - name: Run tests
       run: cargo test --verbose
+
+    - name: Run performance tests
+      run: cargo test --test run_performance -- --ignored

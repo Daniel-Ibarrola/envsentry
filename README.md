@@ -71,6 +71,28 @@ Missing env variable:
 	API_SECRET (./src/auth.rs:42:25)
 ```
 
+## Testing
+
+To run the standard tests:
+
+```bash
+cargo test
+```
+
+### Performance Tests
+
+The project includes a performance test suite to ensure efficiency with large projects. These tests are ignored by default and must be run manually:
+
+```bash
+cargo test --test run_performance -- --ignored
+```
+
+To see the performance metrics during execution:
+
+```bash
+cargo test --test run_performance -- --ignored --nocapture
+```
+
 ## License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
